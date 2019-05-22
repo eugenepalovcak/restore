@@ -1,3 +1,6 @@
 # UCSF restore
 
-A program for denoising cryo-EM images
+Restore is a program for denoising images from cryogenic electron microscopy.
+
+Usage:
+restore.py --train --micrographs micrographs.star 
