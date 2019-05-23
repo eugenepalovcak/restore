@@ -1,7 +1,8 @@
 # UCSF restore
 
-Restore is a program for denoising images from cryogenic electron microscopy.
+Restore is a program for denoising images from cryogenic electron microscopy with a neural network. 
 
+[MotionCor2](https://msg.ucsf.edu/software)(version is recommended for generating the training data. 
 
 ## Installation for Linux (GPU-accelerated)
 
