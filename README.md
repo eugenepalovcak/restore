@@ -8,3 +8,4 @@ Restore is a program for denoising images from cryogenic electron microscopy wit
 
 1. Make sure the [NVIDIA](https://www.nvidia.com/Download/index.aspx?lang=en-us) driver is up-to-date. (Must be >410)
 2. [Install Miniconda3](https://conda.io/projects/conda/en/latest/user-guide/install/linux.html) (or Anaconda) if necessary. 
+3. Download the package and type: `conda env create -f restore.yml`. This make take a few minutes.
