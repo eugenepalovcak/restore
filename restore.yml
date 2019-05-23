@@ -66,11 +66,13 @@ dependencies:
   - libuuid=2.32.1=h14c3975_1000
   - libxcb=1.13=h14c3975_1002
   - libxml2=2.9.9=h13577e0_0
+  - llvmlite=0.28.0=py36hdbcaa40_0
   - mako=1.0.10=py_0
   - markupsafe=1.1.1=py36h14c3975_0
   - matplotlib=3.1.0=py36_0
   - matplotlib-base=3.1.0=py36h5f35d83_0
   - ncurses=6.1=hf484d3e_1002
+  - numba=0.43.1=py36hf2d7682_0
   - openssl=1.1.1b=h14c3975_1
   - pandas=0.24.2=py36hf484d3e_0
   - parso=0.4.0=py_0
@@ -108,4 +110,3 @@ dependencies:
   - grpcio=1.16.1=py36hf8bcb03_1
   - libgcc-ng=8.2.0=hdf63c60_1
   - libstdcxx-ng=8.2.0=hdf63c60_1
-
