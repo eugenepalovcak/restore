@@ -56,7 +56,6 @@ def bin_mic(mic, apix, cutoff, mic_freqs=None, lp=True, bwo=5):
 
     return mic_bin
 
-
 def get_patches(img, w=192, overlap=0):
     """Extract patches of size w from an image, optionally with an overlap.
     w is given in pixels. overlap is given as a fraction of w."""
@@ -69,6 +68,9 @@ def get_patches(img, w=192, overlap=0):
 
     return np.array(patches)
   
+def normalize(x):
+    """ Z-score normalization for array x """
+    return (x - x.mean()) / x.std()
 
 def get_mic_freqs(mic, apix, angles=False):
     """Returns array of effective spatial frequencies for a real 2D FFT.
@@ -91,12 +93,12 @@ def fourier_crop(mic_ft, mic_freqs, cutoff):
     f_h = mic_freqs[0]
     f_v = mic_freqs[:n_x//2,0]
 
+    
     c_h = np.searchsorted(f_h, cutoff)
     c_v = np.searchsorted(f_v, cutoff)
 
     mic_ft_crop = np.vstack((mic_ft[:c_v, :c_h], 
                              mic_ft[n_x - c_v:, :c_h]))
-
     return mic_ft_crop
 
 
