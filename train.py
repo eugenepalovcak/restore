@@ -40,6 +40,9 @@ from restore.utils import get_mic_freqs
 from restore.utils import normalize
 from restore.utils import fourier_crop
 
+from restore.model import get_model
+from restore.model import load_trained_model
+
 def main(args):
     """Main function for training a denoising CNN"""
 
@@ -57,9 +60,24 @@ def main(args):
         training_data = args.training_data
 
     else:
-        raise Exception("Neither training micrographs or training_data were provided!")
+        raise Exception(
+            "Neither training micrographs or training_data were provided!")
 
-    return
+    # Initialize a neural network model for training
+    # OR if a pre-trained model is provided, load that instead
+    learning_rate = args.learning_rate
+    num_epochs = args.number_of_epochs
+    epoch_length = args.batches_per_epoch
+    batch_size = args.batch_size
+    
+    if args.initial_model:
+        nn = load_trained_model(args.initial_model)
+    else:
+        nn = get_model(learning_rate)
+
+    
+
+    return 
 
 
 def generate_training_data(training_mics, cutoff, training_data, suffixes,
@@ -115,6 +133,8 @@ def generate_training_data(training_mics, cutoff, training_data, suffixes,
 
     odd_dset.attrs['apix']=apix_bin
     odd_dset.attrs['phaseflip']=phaseflip
+
+    dset_file.close()
     return 
 
 
@@ -132,6 +152,7 @@ def get_dset_shape(star_file, window, apix, cutoff_frequency):
     n_mics = len(star_file)
 
     return (n_patches*n_mics, window, window, 1), n_patches, s, a
+
 
 def process(metadata, cutoff, window, mic_file, freqs, angles, 
             bandpass=True, hp=.005, phaseflip=True):
@@ -157,7 +178,7 @@ def process(metadata, cutoff, window, mic_file, freqs, angles,
     apix_bin = 0.5/freqs_bin[0,-1]
 
     if bandpass:
-        bp_filt = ((1.-1./(1.+(freqs_bin/hp)**10)) 
+        bp_filt = ( (1. - 1./(1.+(freqs_bin/hp)**10)) 
                    + 1./(1.+(freqs_bin/cutoff)**10)/2.)
         mic_ft_bin *= bp_filt
 
@@ -221,8 +242,18 @@ if __name__=="__main__":
     parser.add_argument("--initial_model", "-i", type=str, default=None,
                         help="Initialize training with this pre-trained model")
 
-    parser.add_argument("--batch_size", "-b", type=float, default=12,
+    parser.add_argument("--batch_size", "-b", type=float, default=10,
                         help="Number of training examples used per training batch.")
+
+    parser.add_argument("--learning_rate", "-lr", type=float, default=1e-4,
+                        help="Initial learning rate for training the neural network")
+
+    parser.add_argument("--number_of_epochs", type=int, default=200,
+                        help="Number of training epochs to perform. \
+                              Model checkpoints are produced after every epoch.")
+
+    parser.add_argument("--batches_per_epoch", type=int, default=500,
+                        help="Number of training batches per epoch")
 
     parser.add_argument("--model_prefix", "-x", type=str, default="model", 
                         help="Prefix for model files containing the structure and \
