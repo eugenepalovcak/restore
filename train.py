@@ -42,6 +42,12 @@ from restore.utils import fourier_crop
 
 from restore.model import get_model
 from restore.model import load_trained_model
+from restore.model import SampleGenerator
+from restore.model import Schedule
+from restore.model import get_callbacks
+
+from external.memory_saving_gradients import gradients_memory
+from keras import backend as K
 
 def main(args):
     """Main function for training a denoising CNN"""
@@ -66,8 +72,8 @@ def main(args):
     # Initialize a neural network model for training
     # OR if a pre-trained model is provided, load that instead
     learning_rate = args.learning_rate
-    num_epochs = args.number_of_epochs
-    epoch_length = args.batches_per_epoch
+    number_of_epochs = args.number_of_epochs
+    batches_per_epoch = args.batches_per_epoch
     batch_size = args.batch_size
     
     if args.initial_model:
@@ -75,7 +81,30 @@ def main(args):
     else:
         nn = get_model(learning_rate)
 
+    # Create the model directory
+    model_directory = args.model_directory
+    model_prefix = args.model_prefix
+
+    if not os.path.isdir(model_directory):
+        os.mkdir(model_directory)
+
+    # Set up data generator and callbacks
+    data_generator = SampleGenerator(training_data, batch_size)
     
+    callbacks = get_callbacks(model_directory, model_prefix, 
+                              number_of_epochs, learning_rate)
+
+    # Turn on memory saving gradients
+    K.__dict__["gradients"] = gradients_memory
+    
+
+    # Train with the 'fit_generator' method from Keras
+    history = nn.fit_generator(
+                  generator = data_generator,
+                  steps_per_epoch = batches_per_epoch,
+                  epochs = number_of_epochs,
+                  verbose=1,
+                  callbacks = callbacks)
 
     return 
 
@@ -259,6 +288,9 @@ if __name__=="__main__":
                         help="Prefix for model files containing the structure and \
                               weights of the neural network.")
 
+    parser.add_argument("--model_directory", "-d", type=str, default="Models",
+                        help="Directory where trained model files are saved")
+    
     parser.add_argument("--phaseflip", dest="phaseflip", action="store_true",
                         help="Correct the CTF of the training images by phase-flipping")
 

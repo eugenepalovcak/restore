@@ -31,6 +31,12 @@ from keras.layers import SeparableConv2D
 from keras.models import Model
 from keras.layers import Lambda
 
+from keras.callbacks import LearningRateScheduler
+from keras.callbacks import ModelCheckpoint
+from keras.callbacks import TensorBoard
+from keras.utils.io_utils import HDF5Matrix
+from keras.utils import Sequence
+
 from external.weightnorm import AdamWithWeightnorm
 
 def unet(kernel_size=3, filters=24, expansion=2, layers=5, acti='relu'):
@@ -244,10 +250,59 @@ def load_trained_model(model_file):
                  'AdamWithWeightnorm':AdamWithWeightnorm})
     return nn
 
+class SampleGenerator(Sequence):
+    """ Turns HDF5 training data file into a generator that yields
+    inputs and outputs. Compatible with 'fit_generator' in Keras """
 
+    def __init__(self, training_data, batch_size=10):
+        self.even = HDF5Matrix(training_data, 'even')
+        self.odd = HDF5Matrix(training_data, 'odd')
+        self.batch_size = batch_size
+        self.n_data, self.n_x, self.n_y, self.n_channels = self.even.shape
 
+    def __len__(self):
+        return len(self.even) // self.batch_size
 
+    def __getitem__(self, idx):
+        batch_idx = np.random.randint(0,self.n_data, self.batch_size)
 
+        norm = lambda x: (x-x.mean())/x.std()
+        inputs = np.array([norm(self.even[b]) for b in batch_idx])
+        outputs = np.array([norm(self.odd[b]) for b in batch_idx])
+
+        return inputs, outputs
+
+class Schedule:
+    """ Simple schedule callback for decreasing the learning rate """
+
+    def __init__(self, nb_epochs, initial_lr):
+        self.epochs = nb_epochs
+        self.initial_lr = initial_lr
+
+    def __call__(self, epoch_idx):
+        if epoch_idx < self.epochs * 0.25:
+            return self.initial_lr
+        elif epoch_idx < self.epochs * 0.50:
+            return self.initial_lr * 0.5
+        elif epoch_idx < self.epochs * 0.75:
+            return self.initial_lr * 0.25
+        return self.initial_lr * 0.125
+
+def get_callbacks(model_directory, model_prefix, number_of_epochs, 
+                  learning_rate, tensorboard_directory=None):
+    """ Generates a list of callbacks """
+    l = LearningRateScheduler(
+            schedule=Schedule(number_of_epochs, learning_rate))
+    m = ModelCheckpoint(
+            str(model_directory) + "/{0}".format(model_prefix)
+            + "_{epoch:02d}_{loss:0.3f}.hdf5", verbose=1, 
+            monitor='loss', save_best_only=False, save_weights_only=False)
+
+    callbacks = [l,m]
+    if tensorboard_directory:
+        callbacks.append(TensorBoard(log_dir=tensorboard_directory))
+
+    return callbacks
 
 def main():
     model = waunet()

@@ -1,3 +1,32 @@
+#
+# Code copied directly from Tim Salimans and Yaroslav Bulatov's
+# excellent gradient checkpointing python module:
+# https://github.com/openai/gradient-checkpointing
+#
+#
+#The MIT License
+#
+#Copyright (c) 2018 OpenAI (http://openai.com)
+#
+#Permission is hereby granted, free of charge, to any person obtaining a copy
+#of this software and associated documentation files (the "Software"), to deal
+#in the Software without restriction, including without limitation the rights
+#to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+#copies of the Software, and to permit persons to whom the Software is
+#furnished to do so, subject to the following conditions:
+#
+#The above copyright notice and this permission notice shall be included in
+#all copies or substantial portions of the Software.
+
+#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+#IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+#FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+#AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+#LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+#OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+#THE SOFTWARE.
+
+
 from toposort import toposort
 import contextlib
 import numpy as np
@@ -34,7 +63,8 @@ def gradients(ys, xs, grad_ys=None, checkpoints='collection', **kwargs):
     '''
     Authors: Tim Salimans & Yaroslav Bulatov
 
-    memory efficient gradient implementation inspired by "Training Deep Nets with Sublinear Memory Cost"
+    memory efficient gradient implementation inspired by 
+    "Training Deep Nets with Sublinear Memory Cost"
     by Chen et al. 2016 (https://arxiv.org/abs/1604.06174)
 
     ys,xs,grad_ys,kwargs are the arguments to standard tensorflow tf.gradients
@@ -45,12 +75,16 @@ def gradients(ys, xs, grad_ys=None, checkpoints='collection', **kwargs):
           that we should re-use when calculating the gradients in the backward pass
           all other tensors that do not appear in this list will be re-computed
         - a string specifying how this list should be determined. currently we support
-            - 'speed':  checkpoint all outputs of convolutions and matmuls. these ops are usually the most expensive,
+            - 'speed':  checkpoint all outputs of convolutions and matmuls. 
+                        these ops are usually the most expensive,
                         so checkpointing them maximizes the running speed
-                        (this is a good option if nonlinearities, concats, batchnorms, etc are taking up a lot of memory)
+                        (this is a good option if nonlinearities, concats, batchnorms,
+                        etc are taking up a lot of memory)
             - 'memory': try to minimize the memory usage
-                        (currently using a very simple strategy that identifies a number of bottleneck tensors in the graph to checkpoint)
-            - 'collection': look for a tensorflow collection named 'checkpoints', which holds the tensors to checkpoint
+                        (currently using a very simple strategy that identifies
+                         a number of bottleneck tensors in the graph to checkpoint)
+            - 'collection': look for a tensorflow collection named 'checkpoints', 
+                            which holds the tensors to checkpoint
     '''
 
     #    print("Calling memsaving gradients with", checkpoints)
