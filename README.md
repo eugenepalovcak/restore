@@ -10,5 +10,5 @@ Restore requires a Linux system with an NVIDIA GPU.
 
 1. Make sure the [NVIDIA](https://www.nvidia.com/Download/index.aspx?lang=en-us) driver is up-to-date. (Must be >410)
 2. [Install Miniconda3](https://conda.io/projects/conda/en/latest/user-guide/install/linux.html) (or Anaconda) if necessary. 
-3. Make sure [git](https://git-scm.com/download/linux) is installed. 
-4. Run `sh install.sh` to install [pyem](https://github.com/asarnow/pyem) and the restore code. 
+3. Make sure [git](https://git-scm.com/download/linux) is installed.
+4. Run `sh install.sh` to install [pyem](https://github.com/asarnow/pyem) and the restore code. (THIS DOES NOT WORK YET!)
