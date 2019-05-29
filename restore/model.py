@@ -31,6 +31,7 @@ from keras.layers import SeparableConv2D
 from keras.models import Model
 from keras.layers import Lambda
 
+from keras.models import load_model
 from keras.callbacks import LearningRateScheduler
 from keras.callbacks import ModelCheckpoint
 from keras.callbacks import TensorBoard

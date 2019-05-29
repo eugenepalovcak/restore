@@ -36,6 +36,12 @@ def load_mic(filename):
         mic = mrc.data
     return mic
 
+def save_mic(mic, filename, overwrite=True):
+    """ Save a micrograph (numpy array) in an MRC file """
+    with mrcfile.new(filename, overwrite=overwrite) as mrc:
+        mrc.set_data(mic)
+    return
+
 def load_star(filename):
     """ Load STAR file into a pyem (pandas) data frame"""
     star_file = star.parse_star(filename)
@@ -101,4 +107,9 @@ def fourier_crop(mic_ft, mic_freqs, cutoff):
                              mic_ft[n_x - c_v:, :c_h]))
     return mic_ft_crop
 
+def next32(n):
+    """ Return next integer divisible by 32 """
+    while n%32 !=0:
+        n+=1
+    return n
 

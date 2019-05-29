@@ -20,7 +20,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from h5py import File
-import mrcfile
 import argparse
 import sys
 import os
@@ -97,7 +96,6 @@ def main(args):
     # Turn on memory saving gradients
     K.__dict__["gradients"] = gradients_memory
     
-
     # Train with the 'fit_generator' method from Keras
     history = nn.fit_generator(
                   generator = data_generator,
@@ -192,7 +190,7 @@ def process(metadata, cutoff, window, mic_file, freqs, angles,
     (2) A bandpass filter is applied with pass-band from cutoff to 1/200A
     (3) The FT is multiplied by the sign of the CTF (phase-flipping)
         This is a crude form of CTF correction. 
-    (4) The inverse FT is applied to return to real-space
+    (4) The inverse FT is calculated to return to real-space
     (5) The binned, filtered image is divided into patches, which are
         normalized (Z-score normalization) and returned
     """
