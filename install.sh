@@ -1,4 +1,5 @@
 # Script for installing restore to the local environment
+# This should be replaced with a conda package installation. 
 
 # (1) Create python environment and install dependencies
 conda env create -f restore.yml
@@ -9,5 +10,4 @@ pip install mrcfile
 git clone https://github.com/asarnow/pyem.git
 pip install ./pyem
 
-
-
+# (3) Install 
