@@ -33,7 +33,9 @@ from restore.utils import bin_mic
 from restore.utils import get_mic_freqs
 from restore.utils import normalize
 from restore.utils import fourier_crop
+from restore.utils import fourier_pad_to_shape
 from restore.utils import next32
+from restore.utils import get_softmask
 
 from restore.model import load_trained_model
 
@@ -44,34 +46,34 @@ def main(args):
     star_file = load_star(args.input_micrographs)
     num_mics = len(star_file)
     apix = star.calculate_apix(star_file)
-    cutoff_frequency = 1./args.max_resolution    
+    cutoff_frequency = 1./args.max_resolution  
+    softmask_width = args.softmask_width  
     nn = load_trained_model(args.model)
     suffix = args.output_suffix
     phaseflip=args.phaseflip
-    merge_with_raw=args.merge_with_raw
- 
+
     # Main denoising loop
     for i, metadata in tqdm(star_file.iterrows(),
                             desc="Denoising", total=num_mics):
 
         mic_file = metadata[star.Relion.MICROGRAPH_NAME]
 
-        # Pre-calculate frequency and angle arrays
+        # Pre-calculate frequencies, angles, and soft mask
         if not i:
             first_mic = load_mic(mic_file)
             freqs, angles = get_mic_freqs(first_mic, apix, angles=True)    
-        
+            softmask = get_softmask(freqs, cutoff_frequency, softmask_width)
+
         new_mic = process(nn, mic_file, metadata, freqs, angles, apix, 
-                          cutoff_frequency, phaseflip=phaseflip, 
-                          merge_with_raw=merge_with_raw)
+                          cutoff_frequency, softmask, phaseflip=phaseflip)
 
         new_mic_file = mic_file.replace(".mrc", "{0}.mrc".format(suffix))
         save_mic(new_mic, new_mic_file)
 
     return
 
-def process(nn, mic_file, metadata, freqs, angles, apix, cutoff, 
-            hp=.005, phaseflip=True, merge_with_raw=True):
+def process(nn, mic_file, metadata, freqs, angles, apix, cutoff, softmask,
+            hp=.005, phaseflip=True):
     """ Denoise a cryoEM image 
  
     The following steps are performed:
@@ -80,8 +82,12 @@ def process(nn, mic_file, metadata, freqs, angles, apix, cutoff,
     (3) The inverse FT is calculated to return to real-space
     (4) The micrograph is padded do a dimension divisible by 32
     (5) The padded is passed through the CNN to denoise then unpadded
-    (6) The micrograph is upsampled and optionally merged with the high
-        frequency image in the phase-flipped, non-denoised image.  
+    (6) The micrograph is upsampled by padding the Fourier transform 
+        with zeros. This procedure creates a sharp edge between components
+        with finite amplitudes and zero amplitude, which manifests as
+        high-frequency 'ringing' artefacts in real space. To reduce these,
+        we apply a soft mask to the denoised FT. The width of the soft
+        edge of the mask is a user parameter and has units of Fourier shells. 
     """
 
     # Load the micrograph and phase-flip to correct the CTF
@@ -121,11 +127,18 @@ def process(nn, mic_file, metadata, freqs, angles, apix, cutoff,
     mic_bin = np.pad(mic_bin, ((x_p, x_p), (y_p,y_p)), mode='mean')
     n_x2, n_y2 = mic_bin.shape
 
-    # Denoise the image and unpad
+    # Denoise and unpad the image
     denoised = nn.predict(mic_bin.reshape((1,n_x2,n_y2,1)))
     denoised = denoised.reshape((n_x2,n_y2))
+    denoised = denoised[x_p : n_x+x_p, y_p:n_y+y_p] 
+
+    # Upsample by Fourier padding
+    denoised_ft = rfft2(denoised)
+    denoised_ft_full = fourier_pad_to_shape(denoised_ft, mic_ft.shape)
+    denoised_ft_full *= softmask
     
-    new_mic = denoised
+    denoised_full = irfft2(denoised_ft_full).real.astype(np.float32)
+    new_mic = denoised_full
     return new_mic
 
 
@@ -143,18 +156,14 @@ if __name__ == "__main__":
                               Determines the extent of Fourier binning. Should be \
                               consistent with the resolution of the training data.")
 
+    parser.add_argument("--softmask_width", "-w", type=int, default=100,
+                        help="Width of the soft edge used in the Fourier mask\
+                              during Fourier upsampling. This is essential for \
+                              removing ringing artefacts from the real-space image.\
+                              Value is the number of Fourier pixels for the decay")
+
     parser.add_argument("--output_suffix", "-s", type=str, default="_denoised", 
                         help="Suffix added to denoised image output")
-
-    parser.add_argument("--merge_with_raw", dest='merge_with_raw', action='store_true', 
-                        help="Merge the low-resolution denoised image with \
-                              the uncorrected raw high-resolution image.")
-
-    parser.add_argument("--dont_merge_with_raw", dest='merge_with_raw', action='store_false',
-                        help="Return only the denoised image, upsampled to \
-                              match the dimensions of the input image")
-
-    parser.set_defaults(merge_with_raw=True)
 
     parser.add_argument("--phaseflip", dest="phaseflip", action="store_true",
                         help="Correct the CTF by phase-flipping. Should be consistent \

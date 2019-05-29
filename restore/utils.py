@@ -29,6 +29,9 @@ from pyem import ctf
 from numpy.fft import rfft2, irfft2
 from numpy.fft import rfftfreq, fftfreq
 
+from scipy.ndimage.morphology import binary_erosion
+from scipy.ndimage.morphology import distance_transform_edt
+from scipy.interpolate import interp1d
 
 def load_mic(filename):
     """ Load a micrograph (MRC format) into a numpy array""" 
@@ -61,6 +64,23 @@ def bin_mic(mic, apix, cutoff, mic_freqs=None, lp=True, bwo=5):
     mic_bin = irfft2(fourier_crop(mic_ft, f, cutoff)).real
 
     return mic_bin
+
+def unbin_mic(mic, unbin_shape):
+    """ Upsample a micrograph by padding its Fourier transform
+    Basically a Fourier 'resize' function. While this works, 
+    it's Fourier interpolation, which can causes 'ringing'.
+
+    In practice, we use 'fourier_pad_to_shape' and then process
+    the resulting FT to soften the sharp edges and reduce ringing. 
+    """
+
+    s_x = len(fftfreq(unbin_shape[0]))
+    s_y = len(rfftfreq(unbin_shape[1]))
+
+    mic_ft = rfft2(mic)
+    mic_ft = fourier_pad_to_shape(mic_ft, (s_x,s_y))
+
+    return irfft2(mic_ft).real
 
 def get_patches(img, w=192, overlap=0):
     """Extract patches of size w from an image, optionally with an overlap.
@@ -107,9 +127,51 @@ def fourier_crop(mic_ft, mic_freqs, cutoff):
                              mic_ft[n_x - c_v:, :c_h]))
     return mic_ft_crop
 
+def fourier_pad_to_shape(mic_ft, new_shape):
+    """ Pad a Fourier transform with zeros
+    This is equivalent to upsampling in real-space """
+    
+    # Separate input FT into top and bottom quadrants
+    n_x, n_y = mic_ft.shape
+    top = mic_ft[:n_x//2]
+    bottom = mic_ft[n_x//2:]
+  
+    # Insert quadrants into new, larger FT array
+    mic_ft_pad = np.zeros((new_shape), dtype=np.complex64)
+    mic_ft_pad[:n_x//2, :n_y] = top
+    mic_ft_pad[new_shape[0]-n_x//2:, :n_y] = bottom
+
+    return mic_ft_pad
+
 def next32(n):
     """ Return next integer divisible by 32 """
     while n%32 !=0:
         n+=1
     return n
+
+
+def get_softmask(freqs, cutoff, width):
+    """ Given a frequency array and a cutoff frequency, 
+    generates a soft Fourier mask that decays from 1 to 0
+    over a band of pixels with specified width. Uses a sine 
+    function to smoothly go from 1 to 0.
+
+    Inspired by a trick Daniel Asarnow does in pyem's mask.py
+    """
+
+    # Erode mask 'width' pixels then distance transform
+    mask = freqs < cutoff
+    eroded = binary_erosion(mask, iterations=width, border_value=1)
+    dt = distance_transform_edt(~eroded)
+
+    # Generate soft edge (sine wave) interpolator
+    x = np.arange(1, width+1)
+    y = np.sin(np.linspace(np.pi/2,0, width))
+    f = interp1d(x,y, bounds_error=False, fill_value=(1,0))
+
+    # Interpolate the distance transform so it decays smoothly
+    softmask = f(dt)
+
+    return softmask
+
 
