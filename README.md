@@ -28,7 +28,7 @@ conda activate restore
 git clone https://github.com/asarnow/pyem.git
 pip install ./pyem
 ```
-7. Now, install  `restore`,
+7. Now, install  `restore`:
 ```bash
 pip install .
 ```
@@ -36,7 +36,6 @@ and append the `restore` directory to the `PATH` variable in your `.bashrc` file
 ```bash
 restore_directory=`pwd`
 echo 'export PATH=DIR:$PATH' | sed "s#DIR#${restore_directory}#" >> ~/.bashrc
-
 ```
 Make sure you use '>>' and not '>' or you'll overwrite your bashrc instead appending to it! 
 Source the `.bashrc` and you should be good to go!
