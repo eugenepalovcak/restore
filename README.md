@@ -23,7 +23,7 @@ cd restore
 conda env create -f restore.yml
 conda activate restore
 ```
-6. Now install `mrcfile` (only available with `pip`) and Daniel Asarnow's `pyem`
+6. Now install Daniel Asarnow's `pyem` library for cryo-EM data processing
 ```bash
 git clone https://github.com/asarnow/pyem.git
 pip install ./pyem
