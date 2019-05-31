@@ -154,10 +154,14 @@ def waunet(layers=3, blocks_per_layer=4, expansion=4):
 
     Decoder layers:
     Each layer is a mini WDSR. Upsampling is performed with depth-to-space
-    Skip feature maps from the encoder are merged here.  
+    Skip feature maps from the encoder are merged here. Convolutions in the
+    decoder use even-sized kernels to avoid checkerboard artefacts.
 
-    See: Yu et al.
+    See: 
+    Yu et al.
     "Wide Activation for Efficient and Accurate Image Super-Resolution"
+    Odena et al.
+    "Deconvolution and checkerboard artefacts"    
     """
     kernel_size = k = 3
     num_filters = f = 32
@@ -212,12 +216,13 @@ def waunet(layers=3, blocks_per_layer=4, expansion=4):
         skips.append(n)
 
     # Decoder layers
+    decoder_kernel_size = dk = 4
     for l in reversed(range(layers)):
-        j = expand_and_upsample(n,f,e,k)
+        j = expand_and_upsample(n,f,e,dk)
         n = skipreduce(n, skips[l], f)
         for b in range(blocks_per_layer-1):
-            n = wa_block(n, f, e, k)
-        n = expand_and_upsample(n, f, e, k)
+            n = wa_block(n, f, e, dk)
+        n = expand_and_upsample(n, f, e, dk)
         n = Add()([n,j])
 
     # Output layers
