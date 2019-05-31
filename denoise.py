@@ -151,7 +151,7 @@ if __name__ == "__main__":
     parser.add_argument("--model", "-m", type=str, default=None, 
                         help="Trained neural network model")
 
-    parser.add_argument("--max_resolution", "-r", type=float, default=3.0,
+    parser.add_argument("--max_resolution", "-r", type=float, default=3.5,
                         help="Max resolution to consider in training (angstroms). \
                               Determines the extent of Fourier binning. Should be \
                               consistent with the resolution of the training data.")

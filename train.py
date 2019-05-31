@@ -259,7 +259,7 @@ if __name__=="__main__":
                               If MotionCor2 is used to generate even/odd sums,\
                               the default should be sufficient.")
 
-    parser.add_argument("--max_resolution", "-r", type=float, default=3.0, 
+    parser.add_argument("--max_resolution", "-r", type=float, default=3.5, 
                         help="Max resolution to consider in training (angstroms). \
                               Determines the extent of Fourier binning.")
 
@@ -275,7 +275,7 @@ if __name__=="__main__":
     parser.add_argument("--learning_rate", "-lr", type=float, default=1e-4,
                         help="Initial learning rate for training the neural network")
 
-    parser.add_argument("--number_of_epochs", type=int, default=200,
+    parser.add_argument("--number_of_epochs", type=int, default=100,
                         help="Number of training epochs to perform. \
                               Model checkpoints are produced after every epoch.")
 

@@ -12,6 +12,6 @@ setup(
     author='Eugene Palovcak',
     author_email='eugene.palovcak@gmail.com',
     description='A CNN for denoising cryo-EM images',
-    install_requires=['numpy', 'scipy', 'keras', 'scipy', 'tensorflow', 'mrcfile', 'h5py', 'toposort', 'tqdm'],
+    install_requires=['numpy', 'mrcfile', 'h5py', 'toposort', 'tqdm'],
     zip_safe=False
 )
