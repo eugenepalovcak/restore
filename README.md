@@ -38,7 +38,13 @@ restore_directory=`pwd`
 echo 'export PATH=DIR:$PATH' | sed "s#DIR#${restore_directory}#" >> ~/.bashrc
 
 ```
-Make sure you use '>>' and not '>' or you'll overwrite your bashrc instead appending to it! Finally, source the `.bashrc` and you should be good to go!
+Make sure you use '>>' and not '>' or you'll overwrite your bashrc instead appending to it! 
+Source the `.bashrc` and you should be good to go!
 ```bash
 source ~/.bashrc
 ```
+8. Whenever you want to run `restore`, you simply need to activate the `restore` python environment:
+```bash
+conda activate restore
+```
+and you should be able to run the executables `train.py` and `denoise.py`
