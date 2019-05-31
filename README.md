@@ -25,7 +25,6 @@ conda activate restore
 ```
 6. Now install `mrcfile` (only available with `pip`) and Daniel Asarnow's `pyem`
 ```bash
-pip install mrcfile
 git clone https://github.com/asarnow/pyem.git
 pip install ./pyem
 ```
