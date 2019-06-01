@@ -47,3 +47,8 @@ source ~/.bashrc
 conda activate restore
 ```
 and you should be able to run the executables `train.py` and `denoise.py`
+When you're done using `restore`, you can deactivate the environment:
+```bash
+conda deactivate
+```
+
