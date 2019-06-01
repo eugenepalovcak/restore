@@ -18,7 +18,7 @@ Working on a simpler installation. For the time being:
 git clone https://github.com/eugenepalovcak/restore
 cd restore
 ```
-5. Create an conda python environment that contains the required dependencies. This step may take a few minutes.
+5. Create a conda python environment that contains the required dependencies. This step may take a few minutes.
 ```bash
 conda env create -f restore.yml
 conda activate restore
