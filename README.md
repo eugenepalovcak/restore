@@ -1,6 +1,6 @@
 # UCSF restore
 
-`restore` is a program for denoising cryogenic electron microscopy images with a neural network. 
+`restore` is a program for denoising cryogenic electron microscopy images with a convolutional neural network. 
 
 ## Requirements
 `restore` requires a Linux system with an NVIDIA GPU. 
