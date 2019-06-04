@@ -1,13 +1,11 @@
 # UCSF restore
 
 `restore` is a program for denoising cryogenic electron microscopy images with a convolutional neural network. 
+![Restored proteasomes](https://github.com/eugenepalovcak/restore/blob/master/proteasomes_restored.png)
 
 ## Requirements
 `restore` requires a Linux system with an NVIDIA GPU. 
 [MotionCor2](https://msg.ucsf.edu/software) is recommended for generating the training data. 
-
-## Basic usage
-To be written...
 
 ## Installation for Linux
 
