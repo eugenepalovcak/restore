@@ -51,6 +51,7 @@ def main(args):
     nn = load_trained_model(args.model)
     suffix = args.output_suffix
     phaseflip=args.phaseflip
+    flipback=args.flipback
 
     # Main denoising loop
     for i, metadata in tqdm(star_file.iterrows(),
@@ -65,7 +66,8 @@ def main(args):
             softmask = get_softmask(freqs, cutoff_frequency, softmask_width)
 
         new_mic = process(nn, mic_file, metadata, freqs, angles, apix, 
-                          cutoff_frequency, softmask, phaseflip=phaseflip)
+                          cutoff_frequency, softmask, phaseflip=phaseflip,
+                          flipback=flipback)
 
         new_mic_file = mic_file.replace(".mrc", "{0}.mrc".format(suffix))
         save_mic(new_mic, new_mic_file)
@@ -73,7 +75,7 @@ def main(args):
     return
 
 def process(nn, mic_file, metadata, freqs, angles, apix, cutoff, softmask,
-            hp=.005, phaseflip=True):
+            hp=.005, phaseflip=True, flipback=True):
     """ Denoise a cryoEM image 
  
     The following steps are performed:
@@ -119,6 +121,7 @@ def process(nn, mic_file, metadata, freqs, angles, apix, cutoff, softmask,
 
     bp_filter = ((1. - 1./(1.+ (freqs_bin/ hp)**(10))) 
                      + 1./(1.+ (freqs_bin/ cutoff )**(10)))/2.
+    mic_ft_bin *= bp_filter
     mic_bin = normalize(irfft2(mic_ft_bin).real)
 
     # Pad the image so the dimension is divisible by 32 (2**5)
@@ -136,6 +139,10 @@ def process(nn, mic_file, metadata, freqs, angles, apix, cutoff, softmask,
     denoised_ft = rfft2(denoised)
     denoised_ft_full = fourier_pad_to_shape(denoised_ft, mic_ft.shape)
     denoised_ft_full *= softmask
+
+    # Flip phases back (multiply FT again by sign of the CTF) if requested
+    if phaseflip and flipback:
+        denoised_ft_full *= np.sign(ctf_img)
     
     denoised_full = irfft2(denoised_ft_full).real.astype(np.float32)
     new_mic = denoised_full
@@ -151,7 +158,7 @@ if __name__ == "__main__":
     parser.add_argument("--model", "-m", type=str, default=None, 
                         help="Trained neural network model")
 
-    parser.add_argument("--max_resolution", "-r", type=float, default=3.5,
+    parser.add_argument("--max_resolution", "-r", type=float, default=4.5,
                         help="Max resolution to consider in training (angstroms). \
                               Determines the extent of Fourier binning. Should be \
                               consistent with the resolution of the training data.")
@@ -174,4 +181,15 @@ if __name__ == "__main__":
 
     parser.set_defaults(phaseflip=True)
 
+    parser.add_argument("--flip_phases_back", dest="flipback", action="store_true",
+                        help="Reverse the phase-flip operation after denoising. This \
+                              can be useful for processing denoised images in 3D \
+                              reconstruction softwares that do not support phase-\
+                              flipped images (i.e. cryoSPARC and cisTEM)")
+
+    parser.add_argument("--dont_flip_phases_back", dest="flipback", action="store_false",
+                        help="Don't reverse the phase-flip operation after denoising.")
+
+    parser.set_defaults(flipback=True)
+   
     sys.exit(main(parser.parse_args()))

@@ -259,7 +259,7 @@ if __name__=="__main__":
                               If MotionCor2 is used to generate even/odd sums,\
                               the default should be sufficient.")
 
-    parser.add_argument("--max_resolution", "-r", type=float, default=3.5, 
+    parser.add_argument("--max_resolution", "-r", type=float, default=4.5, 
                         help="Max resolution to consider in training (angstroms). \
                               Determines the extent of Fourier binning.")
 
