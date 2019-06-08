@@ -174,4 +174,40 @@ def get_softmask(freqs, cutoff, width):
 
     return softmask
 
+def get_CC(image1, image2):
+    """ Cross correlation of two images """
+    image1 -= image1.mean()
+    image2 -= image2.mean()
+    numerator = (image1*image2).sum()
+    denominator = (image1**2).sum()**0.5 * (image2**2).sum()**0.5
+    return numerator / denominator
 
+def get_patch_CC(image1, image2):
+    """ Average cross-correlation coefficient over patches of images """
+    patches1 = get_patches(image1)
+    patches2 = get_patches(image2)
+    n_patches = len(patches_1)
+    return np.mean([ get_CC(patches1[i], patches2[i]) 
+                     for i in range(n_patches)])
+
+def get_SNR(image1, image2):
+    """ Estimate the signal-to-noise ratio using the sample 
+    cross-correlation function, as described in Frank and Al-Ali, (1975) 
+
+    Averages the cross-correlation estimate over patches of the image
+    """
+    CC = get_patch_cc(image1, image2)
+    return CC / (1. - CC)
+    
+def get_denoised_SNR(raw_even, raw_odd, denoised_even, denoised_odd):
+    """ Calculates the SNR of a denoised half sum """
+    SNR_raw_half = get_SNR(raw_even, raw_odd)
+    SNR_mixed_half1 = get_SNR(denoised_even, raw_odd)
+    SNR_mixed_half2 = get_SNR(raw_even, denoised_odd)
+    
+    SNR_mixed_half = (SNR_mixed_half1 + SNR_mixed_half2) / 2.
+    SNR_denoised_half = (2*SNR_mixed_half - SNR_raw_half)
+
+    return SNR_denoised_half
+
+### NEED TO ADD SPECTRAL SNR'S
