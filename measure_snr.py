@@ -2,9 +2,7 @@
 # Copyright (C) 2018 Eugene Palovcak
 # University of California, San Francisco
 #
-# Program for characterizing the signal-to-noise ratio
-# of images denoised by a CNN. Typically to be used on a subset of 
-# electron micrographs to characterize. 
+# Program for characterizing the SNR and SSNR of denoised images. 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -200,10 +198,11 @@ if __name__ == "__main__":
                               the default should be sufficient.")
 
     parser.add_argument("--phaseflip", dest="phaseflip", action="store_true",
-                        help="Correct the CTF of the training images by phase-flipping")
+                        help="Correct the CTF of the images by phase-flipping. \
+                              Should be consistent with the training data")
 
     parser.add_argument("--dont_phaseflip", dest="phaseflip", action="store_false",
-                        help="Don't phase-flip the training images.")
+                        help="Don't phase-flip the images.")
 
     parser.set_defaults(phaseflip=True)
 
