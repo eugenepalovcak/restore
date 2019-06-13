@@ -159,7 +159,7 @@ if __name__ == "__main__":
                         help="Trained neural network model")
 
     parser.add_argument("--max_resolution", "-r", type=float, default=4.5,
-                        help="Max resolution to consider in training (angstroms). \
+                        help="Max resolution to consider when denoising (angstroms). \
                               Determines the extent of Fourier binning. Should be \
                               consistent with the resolution of the training data.")
 

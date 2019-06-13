@@ -25,6 +25,7 @@ from itertools import product
 
 from pyem import star
 from pyem import ctf
+from pyem.algo import bincorr
 
 from numpy.fft import rfft2, irfft2
 from numpy.fft import rfftfreq, fftfreq
@@ -186,7 +187,7 @@ def get_patch_CC(image1, image2):
     """ Average cross-correlation coefficient over patches of images """
     patches1 = get_patches(image1)
     patches2 = get_patches(image2)
-    n_patches = len(patches_1)
+    n_patches = len(patches1)
     return np.mean([ get_CC(patches1[i], patches2[i]) 
                      for i in range(n_patches)])
 
@@ -196,11 +197,12 @@ def get_SNR(image1, image2):
 
     Averages the cross-correlation estimate over patches of the image
     """
-    CC = get_patch_cc(image1, image2)
+    CC = get_patch_CC(image1, image2)
     return CC / (1. - CC)
     
 def get_denoised_SNR(raw_even, raw_odd, denoised_even, denoised_odd):
-    """ Calculates the SNR of a denoised half sum """
+    """ Calculates the SNR of a denoised half sum 
+    Also returns the SNR of the raw half sum"""
     SNR_raw_half = get_SNR(raw_even, raw_odd)
     SNR_mixed_half1 = get_SNR(denoised_even, raw_odd)
     SNR_mixed_half2 = get_SNR(raw_even, denoised_odd)
@@ -208,6 +210,48 @@ def get_denoised_SNR(raw_even, raw_odd, denoised_even, denoised_odd):
     SNR_mixed_half = (SNR_mixed_half1 + SNR_mixed_half2) / 2.
     SNR_denoised_half = (2*SNR_mixed_half - SNR_raw_half)
 
-    return SNR_denoised_half
+    return SNR_denoised_half, SNR_raw_half
 
-### NEED TO ADD SPECTRAL SNR'S
+def get_frc(image1, image2, r, nr):
+    """ Calculate the Fourier ring correlation between two images.
+    This is the same as the sample correlation coefficient but divided
+    up into rings in Fourier space. Can yield the spectral SNR. """
+    image1_ft = rfft2(image1)
+    image2_ft = rfft2(image2)
+    frc = np.abs(bincorr(image1_ft, image2_ft, r))[:nr]
+    return frc
+
+def get_SSNR(image1, image2, apix):
+    """ Calculates the SSNR of two images. Basically this is the cross 
+    power spectrum of the images. We use a Welch's method (periodogram
+    averaging) to get better estimates of the cross power spectrum.
+
+    frq: 1D array of frequency bins, from low to high
+    frc: Fourier ring correlation for each frequency bin
+    """
+    patches1 = get_patches(image1, w=256)
+    patches2 = get_patches(image2, w=256)
+
+    window = len(patches1[0][0])
+    s_y, s_x = np.meshgrid(rfftfreq(window), fftfreq(window))
+    s = (s_y**2 + s_x**2)**0.5
+    r = np.round(s*window).astype(np.int64)
+    nr = window // 2
+
+    frq = np.linspace(0, 1./(2.*apix), nr)
+    frc = np.mean([get_frc(p1,p2,r,nr) for p1,p2 in 
+                   zip(patches1,patches2)], axis=0)
+    ssnr = frc / (1.-frc)
+    return frq, ssnr
+
+def get_denoised_SSNR(raw_even, raw_odd, denoised_even, denoised_odd, apix):
+    """ Calculates the SSNR of a denoised half sum.
+    Also returns the frequency bins and the SSNR of the raw half sum """
+    F,SSNR_raw_half = get_SSNR(raw_even, raw_odd, apix)
+    F,SSNR_mixed_half1 = get_SSNR(denoised_even, raw_odd, apix)
+    F,SSNR_mixed_half2 = get_SSNR(raw_even, denoised_odd, apix)
+
+    SSNR_mixed_half = (SSNR_mixed_half1 + SSNR_mixed_half2) / 2.
+    SSNR_denoised_half = (2*SSNR_mixed_half - SSNR_raw_half)
+
+    return F, SSNR_denoised_half, SSNR_raw_half
