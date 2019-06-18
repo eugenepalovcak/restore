@@ -208,7 +208,7 @@ def get_denoised_SNR(raw_even, raw_odd, denoised_even, denoised_odd):
     SNR_mixed_half2 = get_SNR(raw_even, denoised_odd)
     
     SNR_mixed_half = (SNR_mixed_half1 + SNR_mixed_half2) / 2.
-    SNR_denoised_half = (2*SNR_mixed_half - SNR_raw_half)
+    SNR_denoised_half = (SNR_mixed_half**2)/SNR_raw_half
 
     return SNR_denoised_half, SNR_raw_half
 
@@ -252,6 +252,6 @@ def get_denoised_SSNR(raw_even, raw_odd, denoised_even, denoised_odd, apix):
     F,SSNR_mixed_half2 = get_SSNR(raw_even, denoised_odd, apix)
 
     SSNR_mixed_half = (SSNR_mixed_half1 + SSNR_mixed_half2) / 2.
-    SSNR_denoised_half = (2*SSNR_mixed_half - SSNR_raw_half)
+    SSNR_denoised_half = (SSNR_mixed_half**2)/SSNR_raw_half
 
     return F, SSNR_denoised_half, SSNR_raw_half
