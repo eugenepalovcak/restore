@@ -11,6 +11,6 @@ dependencies:
   - tensorflow-gpu=1.13
   - keras=2.2.4
   - h5py=2.9.0
-  - matplotlib 
+  - matplotlib
   - tqdm
   - toposort
