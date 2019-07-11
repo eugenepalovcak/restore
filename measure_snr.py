@@ -51,13 +51,11 @@ def main(args):
     nn = load_trained_model(args.model)
     orig,even,odd = args.even_odd_suffix.split(",")
     phaseflip=args.phaseflip
+    augment=args.augment
 
     SNR_df = pd.DataFrame(columns=["MicrographName", 
-                                   "SNR_raw",
-                                   "SNR_denoised", 
-                                   "Frequencies", 
-                                   "SSNR_raw",
-                                   "SSNR_denoised"])
+                                   "var_S", "var_Nraw",
+                                   "var_Nden", "var_B", "var_SB"])
 
     # Main denoising loop
     for i, metadata in tqdm(star_file.iterrows(),
@@ -72,43 +70,38 @@ def main(args):
 
         # Bin and denoise the even and odd micrographs
         even_mic_file = mic_file.replace(orig,even)
-        even_raw_bin, even_den_bin = process_snr(
-                                         nn, even_mic_file, metadata, 
-                                         freqs, angles, apix, 
-                                         cutoff_frequency, 
-                                         phaseflip=phaseflip)
+        Re, De = process_snr(nn, even_mic_file, metadata, 
+                             freqs, angles, apix, 
+                             cutoff_frequency, 
+                             phaseflip=phaseflip, augment=augment)
 
         odd_mic_file = mic_file.replace(orig,odd)
-        odd_raw_bin, odd_den_bin = process_snr(
-                                       nn, odd_mic_file, metadata,
-                                       freqs, angles, apix,
-                                       cutoff_frequency,
-                                       phaseflip=phaseflip)
+        Ro, Do = process_snr(nn, odd_mic_file, metadata,
+                             freqs, angles, apix,
+                             cutoff_frequency,
+                             phaseflip=phaseflip, augment=augment)
 
-        # Calculate SNR and SSNRs
-        old_x_dim,_ = first_mic.shape
-        new_x_dim,_ = even_raw_bin.shape
+        # Calculate covariances for plotting later
+        var_S = cov(Re,Ro)
+        var_Nraw = cov(Re,Re) - var_S
 
-        new_apix = apix * (old_x_dim / new_x_dim)
-        SNR_den, SNR_raw = get_denoised_SNR(
-                               even_raw_bin, odd_raw_bin,
-                               even_den_bin, odd_den_bin)
+        var_SplusB = cov(De, Do)
+        var_Nden = cov(De, De) - var_SplusB
+        var_B = var_SplusB + var_S - 2*cov(De,Ro)
+        var_SB = cov(De,Ro) - var(S)
 
-        frequencies, SSNR_den, SSNR_raw = get_denoised_SSNR(
-                                              even_raw_bin, odd_raw_bin,
-                                              even_den_bin, odd_den_bin,
-                                              new_apix)
-
-        # Save the SNR in the dataframe
-        SNR_df.loc[i] = [mic_file, SNR_raw, SNR_den, 
-                         frequencies, SSNR_raw, SSNR_den]
+        SNR_df.loc[i] = [mic_file, var_S, var_Nraw, var_Nden, var_B, var_SB]
 
     SNR_df.to_pickle(args.output_dataframe)
     return
 
+def cov(X,Y):
+    """ Estimate the covariance between two images """
+    return np.sum((X - X.mean())*(Y - Y.mean()))
+
 
 def process_snr(nn, mic_file, metadata, freqs, angles, apix, cutoff,
-            hp=.005, phaseflip=True):
+            hp=.005, phaseflip=True, augment=True):
     """ Denoise a cryoEM image for SNR calculation
  
     The following steps are performed:
@@ -158,13 +151,30 @@ def process_snr(nn, mic_file, metadata, freqs, angles, apix, cutoff,
     mic_bin = np.pad(mic_bin, ((x_p, x_p), (y_p,y_p)), mode='mean')
     n_x2, n_y2 = mic_bin.shape
 
+
     # Denoise and unpad the image
-    denoised = nn.predict(mic_bin.reshape((1,n_x2,n_y2,1)))
-    denoised = denoised.reshape((n_x2,n_y2))
+    # Optionally, generate augmented copies of the data by rotation
+    # and reflection (reflection not implemented yet). The idea here is
+    # to average over the rotation/reflection-covariant kernels and maybe
+    # further reduce the noise/bias? We will test this directly and add 
+    # to denoise.py if the results are favorable... 
+    if augment:
+        m = mic_bin.reshape((1,n_x2,n_y2,1))
 
-    denoised = normalize(denoised[x_p : n_x+x_p, y_p:n_y+y_p])
-    raw = normalize(mic_bin[x_p : n_x+x_p, y_p:n_y+y_p])
+        denoised = [np.rot90(m, i+1, axes=(1,2)) for i in range(4)]
+        denoised = [nn.predict(denoised[i]) for i in range(4)]
+        denoised = [np.rot90(denoised[i], -(i+1), axes=(1,2)) for i in range(4)]
+        denoised = np.mean(np.array(denoised), axis=0)
 
+        denoised = denoised.reshape((n_x2,n_y2))
+
+    else:
+        denoised = nn.predict(mic_bin.reshape((1,n_x2,n_y2,1)))
+        denoised = denoised.reshape((n_x2,n_y2))
+
+    # We don't normalize the outputs for calculate covariances
+    denoised = denoised[x_p : n_x+x_p, y_p:n_y+y_p]
+    raw = mic_bin[x_p : n_x+x_p, y_p:n_y+y_p]
     return raw, denoised
 
 
@@ -205,6 +215,17 @@ if __name__ == "__main__":
                         help="Don't phase-flip the images.")
 
     parser.set_defaults(phaseflip=True)
+
+    parser.add_argument("--augment", dest="augment", action="store_true",
+                        help="Rotate and reflect each microgaph before denoising, \
+                              building up a set of images to average. The idea is that\
+                              this should further reduce the variance of the estimate, \
+                              and possibly the bias as well.")
+
+    parser.add_argument("--dont_augment", dest="augment", action="store_false",
+                        help="Don't averaged over rotated denoised images.")
+
+    parser.set_defaults(augment=False)
 
     sys.exit(main(parser.parse_args()))
 
