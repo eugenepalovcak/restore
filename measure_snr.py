@@ -101,7 +101,7 @@ def cov(X,Y):
 
 
 def process_snr(nn, mic_file, metadata, freqs, angles, apix, cutoff,
-            hp=.005, phaseflip=True, augment=True):
+            hp=.005, phaseflip=True, augment=False):
     """ Denoise a cryoEM image for SNR calculation
  
     The following steps are performed:
