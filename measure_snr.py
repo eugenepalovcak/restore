@@ -35,8 +35,8 @@ from restore.utils import normalize
 from restore.utils import fourier_crop
 from restore.utils import fourier_pad_to_shape
 from restore.utils import next32
-from restore.utils import get_denoised_SNR
-from restore.utils import get_denoised_SSNR
+from restore.utils import get_variances
+from restore.utils import get_spectral_variances
 from restore.model import load_trained_model
 
 
@@ -54,8 +54,9 @@ def main(args):
     augment=args.augment
 
     SNR_df = pd.DataFrame(columns=["MicrographName", 
-                                   "var_S", "var_Nraw",
-                                   "var_Nden", "var_B", "var_SB"])
+                 "var_S", "var_N_noisy", "var_N_denoised", "var_B",
+                 "frequencies", "svar_S", "svar_N_noisy", 
+                 "svar_N_denoised", "svar_N_bias"])
 
     # Main denoising loop
     for i, metadata in tqdm(star_file.iterrows(),
@@ -81,16 +82,15 @@ def main(args):
                              cutoff_frequency,
                              phaseflip=phaseflip, augment=augment)
 
-        # Calculate covariances for plotting later
-        var_S = cov(Re,Ro)
-        var_Nraw = cov(Re,Re) - var_S
+        # Calculate variances and spectral variances for plotting
+        var_S, var_N_noisy, var_N_denoised, var_B = get_variances(Re,Ro,De,Do)    
 
-        var_SplusB = cov(De, Do)
-        var_Nden = cov(De, De) - var_SplusB
-        var_B = var_SplusB + var_S - 2*cov(De,Ro)
-        var_SB = cov(De,Ro) - var(S)
-
-        SNR_df.loc[i] = [mic_file, var_S, var_Nraw, var_Nden, var_B, var_SB]
+        frequencies, svar_S, svar_N_noisy, svar_N_denoised, svar_B = \
+            get_spectral_variances(Re, Ro, De, Do, apix=apix),     
+        
+        SNR_df.loc[i] = [mic_file, var_S, var_N_noisy, var_N_denoised, var_B, 
+                         frequencies, svar_S, svar_N_noisy, svar_N_denoised,
+                         svar_N_bias]
 
     SNR_df.to_pickle(args.output_dataframe)
     return
@@ -103,7 +103,7 @@ def cov(X,Y):
 def process_snr(nn, mic_file, metadata, freqs, angles, apix, cutoff,
             hp=.005, phaseflip=True, augment=False):
     """ Denoise a cryoEM image for SNR calculation
- 
+
     The following steps are performed:
     (1) The micrograph is loaded, phaseflipped, and Fourier cropped
     (2) A bandpass filter is applied with pass-band from cutoff to 1/200A
