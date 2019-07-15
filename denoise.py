@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 # Copyright (C) 2018 Eugene Palovcak
 # University of California, San Francisco
 #
@@ -75,7 +75,7 @@ def main(args):
     return
 
 def process(nn, mic_file, metadata, freqs, angles, apix, cutoff, softmask,
-            hp=.005, phaseflip=True, flipback=True):
+            hp=.003, phaseflip=True, flipback=True):
     """ Denoise a cryoEM image 
  
     The following steps are performed:
