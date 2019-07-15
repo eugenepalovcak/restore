@@ -175,83 +175,82 @@ def get_softmask(freqs, cutoff, width):
 
     return softmask
 
-def get_CC(image1, image2):
-    """ Cross correlation of two images """
-    image1 -= image1.mean()
-    image2 -= image2.mean()
-    numerator = (image1*image2).sum()
-    denominator = (image1**2).sum()**0.5 * (image2**2).sum()**0.5
-    return numerator / denominator
+def cov(X,Y, bessel_correction=True):
+    """ Calculate the covariance between two random variables """
+    c = np.mean( (X - X.mean())*(Y - Y.mean()) )
+    if bessel_correction:
+        n = float(len(X.flat))
+        c *= n/(n-1)
+    return c
 
-def get_patch_CC(image1, image2):
-    """ Average cross-correlation coefficient over patches of images """
-    patches1 = get_patches(image1)
-    patches2 = get_patches(image2)
-    n_patches = len(patches1)
-    return np.mean([ get_CC(patches1[i], patches2[i]) 
-                     for i in range(n_patches)])
+def get_variances(Re,Ro,De,Do):
+    """ Computes var(S), var(N_noisy), var(N_denoised), var(B)
+    for a set of four images:
+    Re: noisy even-sum image
+    Ro: noisy odd-sum image
+    De: denoised even-sum image
+    Do: denoised odd-sum image """
+    var_S = cov(Re,Ro)
+    var_N_noisy = cov(Re,Re) - var_S
+    var_SplusB = cov(De,Do)
+    var_N_denoised = cov(De,De) - var_SplusB
+    var_B = var_SplusB + var_S - 2*cov(De,Ro)
+    return var_S, var_N_noisy, var_N_denoised, var_B
 
-def get_SNR(image1, image2):
-    """ Estimate the signal-to-noise ratio using the sample 
-    cross-correlation function, as described in Frank and Al-Ali, (1975) 
+def get_bins(w=192):
+    """ Get spectral bins for an image """
+    nx,ny = w,w
+    x,y = np.meshgrid(rfftfreq(ny), fftfreq(nx))
+    s = (np.sqrt(x**2 + y**2)*nx).astype(np.int32)
+    return s
 
-    Averages the cross-correlation estimate over patches of the image
+def spectral_cov(X, Y, bins, bessel_correction=False):
+    """ Computes the spectral covariance of two Fourier transforms
+    1. X_k and Y_k are complex random variables corresponding to the 
+       components in the kth Fourier ring 
+    2. Assumes the mean component has been subtracted from each ring,
+       which is done by subtract_ring_mean.
+    3. Computes covariance as mean(X_k * Y_k.conj) 
+    4. Optionally applies the bessel correction (n/n-1), which
+       might give a better variance estimate with few components. 
     """
-    CC = get_patch_CC(image1, image2)
-    return CC / (1. - CC)
-    
-def get_denoised_SNR(raw_even, raw_odd, denoised_even, denoised_odd):
-    """ Calculates the SNR of a denoised half sum 
-    Also returns the SNR of the raw half sum"""
-    SNR_raw_half = get_SNR(raw_even, raw_odd)
-    SNR_mixed_half1 = get_SNR(denoised_even, raw_odd)
-    SNR_mixed_half2 = get_SNR(raw_even, denoised_odd)
-    
-    SNR_mixed_half = (SNR_mixed_half1 + SNR_mixed_half2) / 2.
-    SNR_denoised_half = (SNR_mixed_half**2)/SNR_raw_half
+    bflat = bins.ravel()
+    nr = np.bincount(bflat)
+    nr = (nr-1) if bessel_correction else nr
+    cov = X.ravel() * Y.conj().ravel()
+    scov_r = np.bincount(bflat, cov.real)/nr
+    scov_i = np.bincount(bflat, cov.imag)/nr
+    scov = scov_r + scov_i*1j
+    scov = np.abs(scov)[:bins.shape[0]//2]
+    return scov
 
-    return SNR_denoised_half, SNR_raw_half
+def get_spectral_cov(Xs,Ys,bins,apix=1.,bessel_correction=True):
+    """ Computes spectral covariance for a stack of image patch FTs """
+    w,_=Xs[0].shape
+    frq = np.linspace(0,1./(2*apix), w//2)
+    scov_means = [spectral_cov(p1, p2, bins, bessel_correction)
+                  for p1,p2 in zip(Xs,Ys)]
+    scov_mean = np.mean(scov_means, axis=0)
+    return scov_mean,frq
 
-def get_frc(image1, image2, r, nr):
-    """ Calculate the Fourier ring correlation between two images.
-    This is the same as the sample correlation coefficient but divided
-    up into rings in Fourier space. Can yield the spectral SNR. """
-    image1_ft = rfft2(image1)
-    image2_ft = rfft2(image2)
-    frc = np.abs(bincorr(image1_ft, image2_ft, r))[:nr]
-    return frc
+def get_spectral_variances(Re, Ro, De, Do, apix=1, window=128):
+    """ Computes spectral versions of variances """
+    bins = get_bins(window)
 
-def get_SSNR(image1, image2, apix):
-    """ Calculates the SSNR of two images. Basically this is the cross 
-    power spectrum of the images. We use a Welch's method (periodogram
-    averaging) to get better estimates of the cross power spectrum.
+    Refts = [rfft2(p) for p in get_patches(Re, w=window)]
+    Rofts = [rfft2(p) for p in get_patches(Ro, w=window)]
+    Defts = [rfft2(p) for p in get_patches(De, w=window)]
+    Dofts = [rfft2(p) for p in get_patches(Do, w=window)]
 
-    frq: 1D array of frequency bins, from low to high
-    frc: Fourier ring correlation for each frequency bin
-    """
-    patches1 = get_patches(image1, w=256)
-    patches2 = get_patches(image2, w=256)
+    svar_S,frq = get_spectral_cov(Refts,Rofts,bins,apix)
+    svar_Re,frq = get_spectral_cov(Refts,Refts,bins,apix)
+    svar_De,frq = get_spectral_cov(Defts,Defts,bins,apix)
+    scov_DeDo, frq = get_spectral_cov(Defts,Dofts,bins,apix)
+    scov_DeRo, frq = get_spectral_cov(Defts,Rofts,bins,apix)
 
-    window = len(patches1[0][0])
-    s_y, s_x = np.meshgrid(rfftfreq(window), fftfreq(window))
-    s = (s_y**2 + s_x**2)**0.5
-    r = np.round(s*window).astype(np.int64)
-    nr = window // 2
+    svar_N_noisy = svar_Re - svar_S
+    svar_N_denoised = svar_De - scov_DeDo
+    svar_B = scov_DeDo + svar_S - 2*scov_DeRo
 
-    frq = np.linspace(0, 1./(2.*apix), nr)
-    frc = np.mean([get_frc(p1,p2,r,nr) for p1,p2 in 
-                   zip(patches1,patches2)], axis=0)
-    ssnr = frc / (1.-frc)
-    return frq, ssnr
+    return frq, svar_S, svar_N_noisy, svar_N_denoised, svar_B
 
-def get_denoised_SSNR(raw_even, raw_odd, denoised_even, denoised_odd, apix):
-    """ Calculates the SSNR of a denoised half sum.
-    Also returns the frequency bins and the SSNR of the raw half sum """
-    F,SSNR_raw_half = get_SSNR(raw_even, raw_odd, apix)
-    F,SSNR_mixed_half1 = get_SSNR(denoised_even, raw_odd, apix)
-    F,SSNR_mixed_half2 = get_SSNR(raw_even, denoised_odd, apix)
-
-    SSNR_mixed_half = (SSNR_mixed_half1 + SSNR_mixed_half2) / 2.
-    SSNR_denoised_half = (SSNR_mixed_half**2)/SSNR_raw_half
-
-    return F, SSNR_denoised_half, SSNR_raw_half
