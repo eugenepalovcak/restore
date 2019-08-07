@@ -233,7 +233,7 @@ def get_spectral_cov(Xs,Ys,bins,apix=1.,bessel_correction=True):
     scov_mean = np.mean(scov_means, axis=0)
     return scov_mean,frq
 
-def get_spectral_variances(Re, Ro, De, Do, apix=1, window=128):
+def get_spectral_variances(Re, Ro, De, Do, apix=1, window=192):
     """ Computes spectral versions of variances """
     bins = get_bins(window)
 

@@ -56,7 +56,7 @@ def main(args):
     SNR_df = pd.DataFrame(columns=["MicrographName", 
                  "var_S", "var_N_noisy", "var_N_denoised", "var_B",
                  "frequencies", "svar_S", "svar_N_noisy", 
-                 "svar_N_denoised", "svar_N_bias"])
+                 "svar_N_denoised", "svar_B"])
 
     # Main denoising loop
     for i, metadata in tqdm(star_file.iterrows(),
@@ -86,11 +86,10 @@ def main(args):
         var_S, var_N_noisy, var_N_denoised, var_B = get_variances(Re,Ro,De,Do)    
 
         frequencies, svar_S, svar_N_noisy, svar_N_denoised, svar_B = \
-            get_spectral_variances(Re, Ro, De, Do, apix=apix),     
+            get_spectral_variances(Re, Ro, De, Do, apix=apix)     
         
         SNR_df.loc[i] = [mic_file, var_S, var_N_noisy, var_N_denoised, var_B, 
-                         frequencies, svar_S, svar_N_noisy, svar_N_denoised,
-                         svar_N_bias]
+            frequencies, svar_S, svar_N_noisy, svar_N_denoised, svar_B]
 
     SNR_df.to_pickle(args.output_dataframe)
     return
