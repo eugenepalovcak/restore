@@ -150,6 +150,17 @@ def next32(n):
         n+=1
     return n
 
+def smoothstep(p1,p2,x):
+    """ 5th-order smooth step function.
+    p1: elements less than p1 = 1 
+    p2: elements greater than p2 = 0
+    x: array of numbers to smoothstep
+    """
+    s = np.piecewise(x,
+                    [x<p1, np.logical_and(x>=p1,x<=p2), x>p2],
+                    [0, lambda x:(x-p1)/(p2-p1), 1])
+    return (s**3)*(s*(s*6 - 15)+10)
+
 
 def get_softmask(freqs, cutoff, width):
     """ Given a frequency array and a cutoff frequency, 

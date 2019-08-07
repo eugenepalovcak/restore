@@ -35,7 +35,7 @@ from restore.utils import normalize
 from restore.utils import fourier_crop
 from restore.utils import fourier_pad_to_shape
 from restore.utils import next32
-from restore.utils import get_softmask
+from restore.utils import smoothstep
 
 from restore.model import load_trained_model
 
@@ -47,11 +47,14 @@ def main(args):
     num_mics = len(star_file)
     apix = star.calculate_apix(star_file)
     cutoff_frequency = 1./args.max_resolution  
-    softmask_width = args.softmask_width  
     nn = load_trained_model(args.model)
     suffix = args.output_suffix
-    phaseflip=args.phaseflip
-    flipback=args.flipback
+    phaseflip = args.phaseflip
+    flipback = args.flipback
+    merge_noisy = args.merge_noisy
+    merge_freq1 = 1./(args.merge_resolution+args.merge_width)
+    merge_freq2 = 1./args.merge_resolution
+
 
     # Main denoising loop
     for i, metadata in tqdm(star_file.iterrows(),
@@ -63,11 +66,12 @@ def main(args):
         if not i:
             first_mic = load_mic(mic_file)
             freqs, angles = get_mic_freqs(first_mic, apix, angles=True)    
-            softmask = get_softmask(freqs, cutoff_frequency, softmask_width)
+            softmask = 1.-smoothstep(merge_freq1, merge_freq2, freqs)
+            
 
         new_mic = process(nn, mic_file, metadata, freqs, angles, apix, 
                           cutoff_frequency, softmask, phaseflip=phaseflip,
-                          flipback=flipback)
+                          flipback=flipback, merge_noisy=merge_noisy)
 
         new_mic_file = mic_file.replace(".mrc", "{0}.mrc".format(suffix))
         save_mic(new_mic, new_mic_file)
@@ -88,8 +92,9 @@ def process(nn, mic_file, metadata, freqs, angles, apix, cutoff, softmask,
         with zeros. This procedure creates a sharp edge between components
         with finite amplitudes and zero amplitude, which manifests as
         high-frequency 'ringing' artefacts in real space. To reduce these,
-        we apply a soft mask to the denoised FT. The width of the soft
-        edge of the mask is a user parameter and has units of Fourier shells. 
+        we apply a soft mask to the denoised FT.
+    (7) Optional: the low-pass filtered denoised image is combined with
+        the complementary high-resolution noisy image. 
     """
 
     # Load the micrograph and phase-flip to correct the CTF
@@ -138,7 +143,11 @@ def process(nn, mic_file, metadata, freqs, angles, apix, cutoff, softmask,
     # Upsample by Fourier padding
     denoised_ft = rfft2(denoised)
     denoised_ft_full = fourier_pad_to_shape(denoised_ft, mic_ft.shape)
-    denoised_ft_full *= softmask
+
+    if merge_noisy:
+        denoised_ft_full = denoised_ft_full*softmask + mic_ft*(1-softmask)
+    else:
+        denoised_ft_full = denoised_ft_full*softmask
 
     # Flip phases back (multiply FT again by sign of the CTF) if requested
     if phaseflip and flipback:
@@ -152,30 +161,44 @@ def process(nn, mic_file, metadata, freqs, angles, apix, cutoff, softmask,
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--input_micrographs", "-i", type=str, default=None,
+    parser.add_argument("--input_micrographs", "-m", type=str, default=None,
                         help="STAR file with micrographs to restore")
 
-    parser.add_argument("--model", "-m", type=str, default=None, 
-                        help="Trained neural network model")
+    parser.add_argument("--model", "-p", type=str, default=None, 
+                        help="Neural network model with trained parameters")
 
-    parser.add_argument("--max_resolution", "-r", type=float, default=4.5,
-                        help="Max resolution to consider when denoising (angstroms). \
+    parser.add_argument("--output_suffix", "-s", type=str, default="_denoised",
+                        help="Suffix added to denoised image output")
+
+    parser.add_argument("--max_resolution", "-r", type=float, default=8.,
+                        help="Highest spatial frequencies to consider when denoising (angstroms). \
                               Determines the extent of Fourier binning. Should be \
                               consistent with the resolution of the training data.")
 
-    parser.add_argument("--softmask_width", "-w", type=int, default=100,
-                        help="Width of the soft edge used in the Fourier mask\
-                              during Fourier upsampling. This is essential for \
-                              removing ringing artefacts from the real-space image.\
-                              Value is the number of Fourier pixels for the decay")
+    parser.add_argument("--merge_resolution", "-x", type=float, default=14.,
+                        help="Fourier components lower than this are included in the final denoised image")
 
-    parser.add_argument("--output_suffix", "-s", type=str, default="_denoised", 
-                        help="Suffix added to denoised image output")
+    parser.add_argument("--merge_width", "-w", type=float, default=2.,
+                        help="Sets the width of the smooth amplitude decay. \
+                              Ex. if merge_resolution=14 and merge_width=2, \
+                              then the denoised image is Fourier filtered with \
+                              a lowpass amplitude filter that smoothly decays \
+                              from 1 to 0 over the 1/16A to 1/14A frequency band." )                              
+
+    parser.add_argument("--merge_noisy", dest="merge_noisy", action="store_true",
+                        help="Merge the low-resolution denoised image with the \
+                              high-resolution components of the raw image. If false,\
+                              Otherwise, the merge filter is used as a lowpass filter.")
+
+    parser.add_argument("--dont_merge_noisy", dest="merge_noisy", action="store_false",
+                        help="Don't merge the low-resolution denoised image with the \
+                              high-resolution noisy image")
+
+    parser.set_defaults(merge_noisy=True)
 
     parser.add_argument("--phaseflip", dest="phaseflip", action="store_true",
                         help="Correct the CTF by phase-flipping. Should be consistent \
                               with the training data.")
-
     parser.add_argument("--dont_phaseflip", dest="phaseflip", action="store_false",
                         help="Don't phase-flip.")
 
@@ -189,7 +212,6 @@ if __name__ == "__main__":
 
     parser.add_argument("--dont_flip_phases_back", dest="flipback", action="store_false",
                         help="Don't reverse the phase-flip operation after denoising.")
-
     parser.set_defaults(flipback=True)
    
     sys.exit(main(parser.parse_args()))
