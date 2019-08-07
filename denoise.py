@@ -79,7 +79,7 @@ def main(args):
     return
 
 def process(nn, mic_file, metadata, freqs, angles, apix, cutoff, softmask,
-            hp=.003, phaseflip=True, flipback=True):
+            hp=.003, phaseflip=True, flipback=True, merge_noisy=True):
     """ Denoise a cryoEM image 
  
     The following steps are performed:
@@ -170,7 +170,7 @@ if __name__ == "__main__":
     parser.add_argument("--output_suffix", "-s", type=str, default="_denoised",
                         help="Suffix added to denoised image output")
 
-    parser.add_argument("--max_resolution", "-r", type=float, default=8.,
+    parser.add_argument("--max_resolution", "-r", type=float, default=4.5,
                         help="Highest spatial frequencies to consider when denoising (angstroms). \
                               Determines the extent of Fourier binning. Should be \
                               consistent with the resolution of the training data.")
