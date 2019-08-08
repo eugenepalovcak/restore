@@ -66,12 +66,13 @@ def main(args):
         if not i:
             first_mic = load_mic(mic_file)
             freqs, angles = get_mic_freqs(first_mic, apix, angles=True)    
-            softmask = 1.-smoothstep(merge_freq1, merge_freq2, freqs)
-            
+            softmask = 1.- smoothstep(merge_freq1, merge_freq2, freqs)
+            merge_band = (softmask<1) * (softmask>0)
 
         new_mic = process(nn, mic_file, metadata, freqs, angles, apix, 
-                          cutoff_frequency, softmask, phaseflip=phaseflip,
-                          flipback=flipback, merge_noisy=merge_noisy)
+                          cutoff_frequency, softmask, merge_band, 
+                          phaseflip=phaseflip, flipback=flipback, 
+                          merge_noisy=merge_noisy)
 
         new_mic_file = mic_file.replace(".mrc", "{0}.mrc".format(suffix))
         save_mic(new_mic, new_mic_file)
@@ -79,7 +80,7 @@ def main(args):
     return
 
 def process(nn, mic_file, metadata, freqs, angles, apix, cutoff, softmask,
-            hp=.003, phaseflip=True, flipback=True, merge_noisy=True):
+            merge_band, hp=.003, phaseflip=True, flipback=True, merge_noisy=True):
     """ Denoise a cryoEM image 
  
     The following steps are performed:
@@ -98,7 +99,7 @@ def process(nn, mic_file, metadata, freqs, angles, apix, cutoff, softmask,
     """
 
     # Load the micrograph and phase-flip to correct the CTF
-    mic = load_mic(mic_file)
+    mic = normalize(load_mic(mic_file))
     mic_ft = rfft2(mic) 
 
     if phaseflip:
@@ -119,6 +120,7 @@ def process(nn, mic_file, metadata, freqs, angles, apix, cutoff, softmask,
                                lp=2*apix)
 
         mic_ft *= np.sign(ctf_img)
+        
 
     # Fourier crop the micrograph and bandpass filter
     mic_ft_bin = fourier_crop(mic_ft, freqs, cutoff)
@@ -141,11 +143,14 @@ def process(nn, mic_file, metadata, freqs, angles, apix, cutoff, softmask,
     denoised = denoised[x_p : n_x+x_p, y_p:n_y+y_p] 
 
     # Upsample by Fourier padding
-    denoised_ft = rfft2(denoised)
+    denoised_ft = rfft2(normalize(denoised))
     denoised_ft_full = fourier_pad_to_shape(denoised_ft, mic_ft.shape)
 
+    # Merge images or apply final low-pass filter
     if merge_noisy:
-        denoised_ft_full = denoised_ft_full*softmask + mic_ft*(1-softmask)
+        merge_factor = np.mean(np.abs(denoised_ft_full[merge_band]) 
+                              /np.abs(mic_ft[merge_band])) 
+        denoised_ft_full = denoised_ft_full*(softmask) + mic_ft*merge_factor*(1.-softmask)
     else:
         denoised_ft_full = denoised_ft_full*softmask
 
@@ -175,10 +180,10 @@ if __name__ == "__main__":
                               Determines the extent of Fourier binning. Should be \
                               consistent with the resolution of the training data.")
 
-    parser.add_argument("--merge_resolution", "-x", type=float, default=14.,
+    parser.add_argument("--merge_resolution", "-x", type=float, default=10.,
                         help="Fourier components lower than this are included in the final denoised image")
 
-    parser.add_argument("--merge_width", "-w", type=float, default=2.,
+    parser.add_argument("--merge_width", "-w", type=float, default=4.,
                         help="Sets the width of the smooth amplitude decay. \
                               Ex. if merge_resolution=14 and merge_width=2, \
                               then the denoised image is Fourier filtered with \
