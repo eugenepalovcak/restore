@@ -146,6 +146,10 @@ def process(nn, mic_file, metadata, freqs, angles, apix, cutoff, softmask,
     denoised_ft = rfft2(normalize(denoised))
     denoised_ft_full = fourier_pad_to_shape(denoised_ft, mic_ft.shape)
 
+    # Flip phases back (multiply FT again by sign of the CTF) if requested
+    if phaseflip and flipback:
+        denoised_ft_full *= np.sign(ctf_img)
+
     # Merge images or apply final low-pass filter
     if merge_noisy:
         merge_factor = np.mean(np.abs(denoised_ft_full[merge_band]) 
@@ -154,10 +158,6 @@ def process(nn, mic_file, metadata, freqs, angles, apix, cutoff, softmask,
     else:
         denoised_ft_full = denoised_ft_full*softmask
 
-    # Flip phases back (multiply FT again by sign of the CTF) if requested
-    if phaseflip and flipback:
-        denoised_ft_full *= np.sign(ctf_img)
-    
     denoised_full = irfft2(denoised_ft_full).real.astype(np.float32)
     new_mic = denoised_full
     return new_mic
