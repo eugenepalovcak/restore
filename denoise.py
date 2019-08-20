@@ -146,17 +146,34 @@ def process(nn, mic_file, metadata, freqs, angles, apix, cutoff, softmask,
     denoised_ft = rfft2(normalize(denoised))
     denoised_ft_full = fourier_pad_to_shape(denoised_ft, mic_ft.shape)
 
+    # Merge images or apply final low-pass filter
+    if merge_noisy:
+        # Sample every nth Fourier amplitude for normalization
+        n = 50
+        denoised_amp_band = np.abs(denoised_ft_full[merge_band][::n]).ravel()
+        noisy_amp_band = np.abs(mic_ft[merge_band][::n]).ravel()
+        merge_factor = (np.std(denoised_amp_band) / np.std(noisy_amp_band))
+
+        # Separate images into amplitude and phase
+        denoised_amp = np.abs(denoised_ft_full)
+        denoised_phase = np.angle(denoised_ft_full)
+
+        noisy_amp = np.abs(mic_ft)
+        noisy_phase = np.angle(mic_ft)
+
+        # Weighted amplitude average, unweighted phase average, reconstruct FT
+        merge_amp = (denoised_amp*softmask) + merge_factor*noisy_amp*(1.-softmask) 
+        merge_phase = (denoised_phase * softmask) + noisy_phase*(1.-softmask)
+        merge_ft = merge_amp*(np.cos(merge_phase) + 1j*np.sin(merge_phase))
+        
+        denoised_ft_full = merge_ft
+
+    else:
+        denoised_ft_full = denoised_ft_full*softmask
+
     # Flip phases back (multiply FT again by sign of the CTF) if requested
     if phaseflip and flipback:
         denoised_ft_full *= np.sign(ctf_img)
-
-    # Merge images or apply final low-pass filter
-    if merge_noisy:
-        merge_factor = np.mean(np.abs(denoised_ft_full[merge_band]) 
-                              /np.abs(mic_ft[merge_band])) 
-        denoised_ft_full = denoised_ft_full*(softmask) + mic_ft*merge_factor*(1.-softmask)
-    else:
-        denoised_ft_full = denoised_ft_full*softmask
 
     denoised_full = irfft2(denoised_ft_full).real.astype(np.float32)
     new_mic = denoised_full
