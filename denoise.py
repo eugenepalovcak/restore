@@ -80,7 +80,7 @@ def main(args):
     return
 
 def process(nn, mic_file, metadata, freqs, angles, apix, cutoff, softmask,
-            merge_band, hp=.003, phaseflip=True, flipback=True, merge_noisy=True):
+            merge_band, hp=.005, phaseflip=True, flipback=False, merge_noisy=False):
     """ Denoise a cryoEM image 
  
     The following steps are performed:
@@ -128,6 +128,7 @@ def process(nn, mic_file, metadata, freqs, angles, apix, cutoff, softmask,
 
     bp_filter = ((1. - 1./(1.+ (freqs_bin/ hp)**(10))) 
                      + 1./(1.+ (freqs_bin/ cutoff )**(10)))/2.
+
     mic_ft_bin *= bp_filter
     mic_bin = normalize(irfft2(mic_ft_bin).real)
 
@@ -197,10 +198,10 @@ if __name__ == "__main__":
                               Determines the extent of Fourier binning. Should be \
                               consistent with the resolution of the training data.")
 
-    parser.add_argument("--merge_resolution", "-x", type=float, default=10.,
+    parser.add_argument("--merge_resolution", "-x", type=float, default=3.,
                         help="Fourier components lower than this are included in the final denoised image")
 
-    parser.add_argument("--merge_width", "-w", type=float, default=4.,
+    parser.add_argument("--merge_width", "-w", type=float, default=2.,
                         help="Sets the width of the smooth amplitude decay. \
                               Ex. if merge_resolution=14 and merge_width=2, \
                               then the denoised image is Fourier filtered with \
@@ -216,7 +217,7 @@ if __name__ == "__main__":
                         help="Don't merge the low-resolution denoised image with the \
                               high-resolution noisy image")
 
-    parser.set_defaults(merge_noisy=True)
+    parser.set_defaults(merge_noisy=False)
 
     parser.add_argument("--phaseflip", dest="phaseflip", action="store_true",
                         help="Correct the CTF by phase-flipping. Should be consistent \
@@ -234,6 +235,6 @@ if __name__ == "__main__":
 
     parser.add_argument("--dont_flip_phases_back", dest="flipback", action="store_false",
                         help="Don't reverse the phase-flip operation after denoising.")
-    parser.set_defaults(flipback=True)
+    parser.set_defaults(flipback=False)
    
     sys.exit(main(parser.parse_args()))

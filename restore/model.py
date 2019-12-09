@@ -40,7 +40,7 @@ from keras.utils import Sequence
 
 from external.weightnorm import AdamWithWeightnorm
 
-def unet(kernel_size=3, filters=24, expansion=2, layers=5, acti='relu'):
+def unet(kernel_size=3, filters=24, expansion=1.5, layers=5, acti='relu'):
     """ Nearly classical U-net model for dense 'array-to-array' predictions.
 
     The main difference between this model and the original U-net proposed
